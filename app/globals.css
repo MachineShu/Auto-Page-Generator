@@ -190,6 +190,55 @@ button {
   font-size: 0.9rem;
 }
 
+.import-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 220px;
+  min-height: 88px;
+  border: 1px dashed rgba(15, 118, 110, 0.32);
+  border-radius: 18px;
+  padding: 16px 22px;
+  background: rgba(255, 255, 255, 0.5);
+  color: transparent;
+  cursor: pointer;
+  font-size: 0;
+  line-height: 0;
+  transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.import-dropzone:hover,
+.import-dropzone-active {
+  border-color: rgba(15, 118, 110, 0.72);
+  background: rgba(15, 118, 110, 0.08);
+  box-shadow: 0 12px 30px rgba(15, 118, 110, 0.12);
+  transform: translateY(-1px);
+}
+
+.import-dropzone-title {
+  color: var(--text);
+  font-size: 0.98rem;
+  line-height: 1.3;
+}
+
+.import-dropzone-hint {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.3;
+}
+
+.import-dropzone input {
+  display: none;
+}
+
+.import-message {
+  margin: -8px 0 0;
+  color: var(--primary);
+  line-height: 1.6;
+}
+
 .module-list {
   display: flex;
   flex-direction: column;
@@ -536,5 +585,10 @@ button:disabled,
   .module-section-summary-meta,
   .input-panel-summary-actions {
     justify-content: flex-start;
+  }
+
+  .import-dropzone {
+    width: 100%;
+    min-width: 0;
   }
 }

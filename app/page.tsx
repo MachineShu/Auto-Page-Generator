@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type ChangeEvent, type DragEvent, useEffect, useState } from "react";
+import { read, utils } from "xlsx";
 
 type GenerationStep = "titleMeta" | "outline" | "article";
 type Phase = "idle" | "running" | "done" | "error";
@@ -66,6 +67,19 @@ type StoredState = {
   modules?: PersistedModuleState[];
 };
 
+type ImportFieldKey =
+  | "primaryKeyword"
+  | "targetWords"
+  | "secondaryKeywords"
+  | "lsiKeywords"
+  | "heroInfo"
+  | "benefitInfo"
+  | "howItWorksInfo"
+  | "useCaseInfo"
+  | "faqInfo";
+
+type ImportedFormRow = Pick<FormState, ImportFieldKey>;
+
 type CompletionResponse = {
   content: string;
   raw: unknown;
@@ -89,6 +103,7 @@ const API_KEY_STORAGE_KEY = "auto-page-generator-api-key";
 const API_KEY_COOKIE_NAME = "auto_page_generator_api_key";
 const POLL_INTERVAL = 15000;
 const MAX_MODULES = 10;
+const MAX_IMPORT_ROWS = 10;
 const LOCAL_SAVE_PORT = 3188;
 const PROVIDER_DOCS_URL = "https://5vm8vsh4qz.apifox.cn/";
 const PROVIDER_BASE_URL = "https://api.guijiapi.net/v1";
@@ -129,6 +144,167 @@ const INITIAL_RESULT: WorkflowResult = {
   articleMarkdown: "",
   updatedAt: null
 };
+
+const IMPORT_FORM_KEYS: ImportFieldKey[] = [
+  "primaryKeyword",
+  "targetWords",
+  "secondaryKeywords",
+  "lsiKeywords",
+  "heroInfo",
+  "benefitInfo",
+  "howItWorksInfo",
+  "useCaseInfo",
+  "faqInfo"
+];
+
+const IMPORT_HEADER_ALIASES: Record<string, ImportFieldKey> = {
+  "主关键词": "primaryKeyword",
+  "核心关键词": "primaryKeyword",
+  "primarykeyword": "primaryKeyword",
+  "mainkeyword": "primaryKeyword",
+  "corekeyword": "primaryKeyword",
+  "指定字数": "targetWords",
+  "目标字数": "targetWords",
+  "字数": "targetWords",
+  "targetwords": "targetWords",
+  "wordcount": "targetWords",
+  "words": "targetWords",
+  "次要关键词": "secondaryKeywords",
+  "相关关键词": "secondaryKeywords",
+  "secondarykeywords": "secondaryKeywords",
+  "secondarykeyword": "secondaryKeywords",
+  "relatedkeywords": "secondaryKeywords",
+  "lsi关键词": "lsiKeywords",
+  "lsikeywords": "lsiKeywords",
+  "lsikeyword": "lsiKeywords",
+  "hero信息": "heroInfo",
+  "heroinfo": "heroInfo",
+  "hero": "heroInfo",
+  "benefit信息": "benefitInfo",
+  "benefits信息": "benefitInfo",
+  "benefitinfo": "benefitInfo",
+  "benefitsinfo": "benefitInfo",
+  "benefit": "benefitInfo",
+  "benefits": "benefitInfo",
+  "howitworks信息": "howItWorksInfo",
+  "howitworksinfo": "howItWorksInfo",
+  "howitworks": "howItWorksInfo",
+  "usecase信息": "useCaseInfo",
+  "usecases信息": "useCaseInfo",
+  "usecaseinfo": "useCaseInfo",
+  "usecasesinfo": "useCaseInfo",
+  "usecase": "useCaseInfo",
+  "usecases": "useCaseInfo",
+  "faq信息": "faqInfo",
+  "faqinfo": "faqInfo",
+  "faq": "faqInfo"
+};
+
+function normalizeImportHeader(header: unknown) {
+  return String(header ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_\-:/\\|()[\]{}"'`，。；;：、（）【】]/g, "");
+}
+
+function stringifyImportCell(value: unknown) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  if (value instanceof Date) {
+    return value.toLocaleDateString("zh-CN");
+  }
+
+  return String(value).trim();
+}
+
+function createEmptyImportedRow(): ImportedFormRow {
+  return IMPORT_FORM_KEYS.reduce(
+    (row, key) => ({
+      ...row,
+      [key]: ""
+    }),
+    {} as ImportedFormRow
+  );
+}
+
+function parseImportedRows(workbook: ReturnType<typeof read>) {
+  const firstSheetName = workbook.SheetNames[0];
+  const firstSheet = firstSheetName ? workbook.Sheets[firstSheetName] : null;
+
+  if (!firstSheet) {
+    return [];
+  }
+
+  const rows = utils.sheet_to_json<unknown[]>(firstSheet, {
+    header: 1,
+    raw: false,
+    defval: ""
+  });
+
+  const nonEmptyRows = rows.filter((row) => row.some((cell) => stringifyImportCell(cell)));
+  if (nonEmptyRows.length < 2) {
+    return [];
+  }
+
+  const headerRow = nonEmptyRows[0];
+  const columnMap = headerRow.map((header) => IMPORT_HEADER_ALIASES[normalizeImportHeader(header)] ?? null);
+
+  if (!columnMap.some(Boolean)) {
+    return [];
+  }
+
+  return nonEmptyRows
+    .slice(1, MAX_IMPORT_ROWS + 1)
+    .map((row) => {
+      const importedRow = createEmptyImportedRow();
+
+      columnMap.forEach((key, columnIndex) => {
+        if (key) {
+          importedRow[key] = stringifyImportCell(row[columnIndex]);
+        }
+      });
+
+      return importedRow;
+    })
+    .filter((row) => IMPORT_FORM_KEYS.some((key) => row[key].trim()));
+}
+
+async function readWorkbookFromFile(file: File) {
+  const extension = file.name.split(".").pop()?.toLowerCase();
+
+  if (extension === "csv") {
+    const text = await file.text();
+    return read(text, { type: "string" });
+  }
+
+  const buffer = await file.arrayBuffer();
+  return read(buffer, { type: "array" });
+}
+
+function createImportedModule(row: ImportedFormRow, previousModule?: WorkflowModuleState) {
+  const base = createInitialModule();
+  const previousForm = previousModule?.form;
+
+  return {
+    ...base,
+    id: previousModule?.id ?? base.id,
+    folderName: null,
+    form: {
+      ...base.form,
+      apiKey: previousForm?.apiKey?.trim() || base.form.apiKey,
+      model: previousForm?.model?.trim() || base.form.model,
+      ...row,
+      extraInfo: ""
+    },
+    availableModels: previousModule?.availableModels?.length ? [...previousModule.availableModels] : base.availableModels,
+    ui: {
+      inputOpen: true,
+      outputOpen: true
+    }
+  };
+}
 
 function readPersistedApiKey() {
   if (typeof window === "undefined" || typeof document === "undefined") {
@@ -994,6 +1170,8 @@ function WorkflowModuleCard({
 export default function HomePage() {
   const [modules, setModules] = useState<WorkflowModuleState[]>([createInitialModule()]);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [importMessage, setImportMessage] = useState("");
+  const [isImportDragging, setIsImportDragging] = useState(false);
 
   useEffect(() => {
     const saved = loadState();
@@ -1071,6 +1249,59 @@ export default function HomePage() {
 
       return [...prev, createInitialModule()];
     });
+  }
+
+  async function handleImportUpload(file: File | undefined) {
+    if (!file) {
+      return;
+    }
+
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    if (!extension || !["csv", "xls", "xlsx"].includes(extension)) {
+      setImportMessage("请上传 .csv、.xls 或 .xlsx 文件。");
+      return;
+    }
+
+    try {
+      const workbook = await readWorkbookFromFile(file);
+      const importedRows = parseImportedRows(workbook);
+
+      if (!importedRows.length) {
+        setImportMessage("没有读取到可用行，请确认首行是字段名，且字段在允许范围内。");
+        return;
+      }
+
+      setModules((prev) => importedRows.map((row, index) => createImportedModule(row, prev[index])));
+      setImportMessage(`已从 ${file.name} 读取 ${importedRows.length} 行，并覆盖当前模块。`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "文件读取失败。";
+      setImportMessage(`导入失败：${message}`);
+    }
+  }
+
+  async function handleImportFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    await handleImportUpload(file);
+  }
+
+  function handleImportDragOver(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsImportDragging(true);
+  }
+
+  function handleImportDragLeave(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsImportDragging(false);
+  }
+
+  function handleImportDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsImportDragging(false);
+    void handleImportUpload(event.dataTransfer.files?.[0]);
   }
 
   function handleRemoveModule(moduleId: string) {
@@ -1481,11 +1712,24 @@ export default function HomePage() {
           </div>
           <div className="workflow-toolbar-actions">
             <span className="workflow-toolbar-count">当前模块数：{modules.length}</span>
+            <label
+              className={isImportDragging ? "import-dropzone import-dropzone-active" : "import-dropzone"}
+              onDragOver={handleImportDragOver}
+              onDragLeave={handleImportDragLeave}
+              onDrop={handleImportDrop}
+            >
+              上传 Excel/CSV
+              <span className="import-dropzone-title">上传 Excel/CSV</span>
+              <span className="import-dropzone-hint">点击或拖拽文件到这里</span>
+              <input type="file" accept=".csv,.xls,.xlsx" onChange={handleImportFile} />
+            </label>
             <button type="button" onClick={handleAddModule} disabled={modules.length >= MAX_MODULES}>
               新增模块
             </button>
           </div>
         </div>
+
+        {importMessage ? <p className="import-message">{importMessage}</p> : null}
 
         <div className="module-list">
           {modules.map((module, index) => (
