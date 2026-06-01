@@ -76,7 +76,8 @@ type ImportFieldKey =
   | "benefitInfo"
   | "howItWorksInfo"
   | "useCaseInfo"
-  | "faqInfo";
+  | "faqInfo"
+  | "extraInfo";
 
 type ImportedFormRow = Pick<FormState, ImportFieldKey>;
 
@@ -111,6 +112,7 @@ const CHAT_COMPLETIONS_URL = `${PROVIDER_BASE_URL}/chat/completions`;
 const MODELS_URL = `${PROVIDER_BASE_URL}/models`;
 
 const BUILTIN_MODELS = [
+  "gemini-3.5-flash",
   "gemini-3.1-pro-preview",
   "gemini-3.1-flash-lite",
   "gpt-5.4-mini",
@@ -154,7 +156,8 @@ const IMPORT_FORM_KEYS: ImportFieldKey[] = [
   "benefitInfo",
   "howItWorksInfo",
   "useCaseInfo",
-  "faqInfo"
+  "faqInfo",
+  "extraInfo"
 ];
 
 const IMPORT_HEADER_ALIASES: Record<string, ImportFieldKey> = {
@@ -197,7 +200,12 @@ const IMPORT_HEADER_ALIASES: Record<string, ImportFieldKey> = {
   "usecases": "useCaseInfo",
   "faq信息": "faqInfo",
   "faqinfo": "faqInfo",
-  "faq": "faqInfo"
+  "faq": "faqInfo",
+  "补充信息": "extraInfo",
+  "其他补充信息": "extraInfo",
+  "additionalinfo": "extraInfo",
+  "extrainfo": "extraInfo",
+  "extra": "extraInfo"
 };
 
 function normalizeImportHeader(header: unknown) {
@@ -295,8 +303,7 @@ function createImportedModule(row: ImportedFormRow, previousModule?: WorkflowMod
       ...base.form,
       apiKey: previousForm?.apiKey?.trim() || base.form.apiKey,
       model: previousForm?.model?.trim() || base.form.model,
-      ...row,
-      extraInfo: ""
+      ...row
     },
     availableModels: previousModule?.availableModels?.length ? [...previousModule.availableModels] : base.availableModels,
     ui: {
