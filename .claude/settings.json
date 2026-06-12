@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.gartner.com)",
+      "WebFetch(domain:www.mckinsey.com)",
+      "WebFetch(domain:www.mordorintelligence.com)",
+      "WebFetch(domain:www.pwc.com)",
+      "WebFetch(domain:www.securitymagazine.com)",
+      "WebFetch(domain:www.forrester.com)",
+      "WebFetch(domain:www.cybersecurityventures.com)",
+      "WebFetch(domain:www.forbes.com)",
+      "WebFetch(domain:www.marketsandmarkets.com)"
+    ]
+  }
+}
