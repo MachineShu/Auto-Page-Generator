@@ -2,7 +2,8 @@ import Link from "next/link";
 
 const NAV_ITEMS = [
   { href: "/", label: "Tool Page Generator" },
-  { href: "/blog-prompt-generator", label: "Blog Prompt Generator" }
+  { href: "/blog-prompt-generator", label: "Blog Prompt Generator" },
+  { href: "/auto-language", label: "Auto Language" }
 ];
 
 export function SiteHeader() {
