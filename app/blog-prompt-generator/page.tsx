@@ -77,7 +77,8 @@ LSI 关键词：[ {{lsi}} ]
 （3）Title 和 description
 下面给我 title 和 description，前者 55 字符以内，后者 150 字符以内，英文；都要命中主关键词 “[ {{keyword}} ]”，且 description 命中几个次要/LSI 关键词
 严禁撰写医学相关的内容，会被谷歌惩罚
-全文围绕地面清洁展开`
+全文围绕地面清洁展开。
+h1 标题命中核心词，12-25 词。最终保存在 output 中。`
   },
   "2": {
     label: "Remote Work",
@@ -143,7 +144,8 @@ LSI 关键词：[ {{lsi}} ]
 （3）Title 和 description
 下面给我 title 和 description，前者 55 字符以内，后者 150 字符以内，英文；都要命中主关键词 “[ {{keyword}} ]”，且 description 命中几个次要/LSI 关键词
 严禁撰写医学相关的内容，会被谷歌惩罚
-全文围绕远程工作展开`
+全文围绕远程工作展开。
+h1 标题命中核心词，12-25 词。最终保存在 output 中。`
   },
   "3": {
     label: "Music",
@@ -346,8 +348,8 @@ LSI 关键词：[ {{lsi}} ]
 （3）Title 和 description
 下面给我 title 和 description，前者 55 字符以内，后者 150 字符以内，英文；都要命中主关键词 “[ {{keyword}} ]”，且 description 命中几个次要/LSI 关键词
 严禁撰写医学相关的内容，会被谷歌惩罚
-全文围绕网络安全展开；
-最终结果输出到 output 文件夹中`
+全文围绕网络安全展开。
+h1 标题命中核心词，12-25 词。最终保存在 output 中。`
   }
 };
 
