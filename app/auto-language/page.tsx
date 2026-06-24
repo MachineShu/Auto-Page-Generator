@@ -241,11 +241,10 @@ export default function AutoLanguagePage() {
     setStatus("running");
     setResults([]);
 
-    for (const languageCode of languagesToGenerate) {
+    // 并发处理所有语言（最大并发数20）
+    const promises = languagesToGenerate.map(async (languageCode) => {
       const language = LANGUAGES.find((l) => l.code === languageCode);
-      if (!language) continue;
-
-      setCurrentLanguage(language.name);
+      if (!language) return null;
 
       try {
         const prompt = buildPrompt(
@@ -257,27 +256,28 @@ export default function AutoLanguagePage() {
 
         const content = await generateContent(apiKey, model, prompt);
 
-        setResults((prev) => [
-          ...prev,
-          {
-            language: language.name,
-            content
-          }
-        ]);
+        return {
+          language: language.name,
+          content
+        };
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "生成失败";
-        setResults((prev) => [
-          ...prev,
-          {
-            language: language.name,
-            content: "",
-            error: errorMessage
-          }
-        ]);
+        return {
+          language: language.name,
+          content: "",
+          error: errorMessage
+        };
       }
-    }
+    });
 
+    const results = await Promise.allSettled(promises);
+
+    const finalResults = results
+      .map((result) => result.status === "fulfilled" ? result.value : null)
+      .filter((result): result is GenerationResult => result !== null);
+
+    setResults(finalResults);
     setStatus("done");
     setCurrentLanguage("");
   }
@@ -299,6 +299,21 @@ export default function AutoLanguagePage() {
     anchor.download = `${language}_optimized.txt`;
     anchor.click();
     window.URL.revokeObjectURL(url);
+  }
+
+  function clearAll() {
+    if (confirm("确定要清空所有语言配置和原文内容吗？")) {
+      setLanguageData({});
+      setOriginalText("");
+    }
+  }
+
+  function clearCurrentLanguage() {
+    setTempKeywords({
+      mainKeyword: "",
+      secondaryKeywords: "",
+      lsiKeywords: ""
+    });
   }
 
   return (
@@ -340,7 +355,29 @@ export default function AutoLanguagePage() {
                   : "language-button"
               }
               onClick={() => openDialog(language.code)}
+              style={{ position: "relative" }}
             >
+              {hasKeywords(language.code) && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: "8px",
+                    right: "8px",
+                    width: "20px",
+                    height: "20px",
+                    borderRadius: "50%",
+                    background: "var(--primary)",
+                    color: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "12px",
+                    fontWeight: "bold"
+                  }}
+                >
+                  ✓
+                </span>
+              )}
               <span className="language-name">{language.name}</span>
               <span className="language-native">{language.nativeName}</span>
             </button>
@@ -408,6 +445,14 @@ export default function AutoLanguagePage() {
             disabled={status === "running"}
           >
             {status === "running" ? "生成中..." : "开始生成"}
+          </button>
+          <button
+            type="button"
+            className="ghost"
+            onClick={clearAll}
+            title="清空所有配置"
+          >
+            🗑️ 清空
           </button>
         </div>
       </section>
@@ -532,6 +577,14 @@ export default function AutoLanguagePage() {
             </div>
 
             <div className="dialog-footer">
+              <button
+                type="button"
+                className="ghost"
+                onClick={clearCurrentLanguage}
+                title="清空当前语种的关键词"
+              >
+                🗑️
+              </button>
               <button type="button" className="ghost" onClick={closeDialog}>
                 取消
               </button>
