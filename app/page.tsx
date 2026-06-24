@@ -505,7 +505,7 @@ function buildArticlePrompt(form: FormState, selectedTitle: string, outlineMarkd
 ${outlineMarkdown}
 
 创作要求：
-1. 核心关键词 [${form.primaryKeyword}] 命中 25-35 次
+1. 核心关键词 [${form.primaryKeyword}] 命中 22-33 次
 2. 只能生成英文，不能生成中文：
 #这是相关词，每个命中 2-4 次#：${form.secondaryKeywords || "无"}
 #这是 LSI 关键词，每个命中 1-2 次#：${form.lsiKeywords || "无"}
@@ -513,8 +513,8 @@ ${outlineMarkdown}
 - Hero 描述性文本：13 字以内
 - Features/Benefits 每个 H3 的文案：20-40 字之间
 - How it works 总字数：70 字以内，且这部分不要 H3
-- Use cases 每个 H3 的文案：55-80 字之间
-- FAQ 共 8 个问题，每个问题 170-270 字之间；每个问题前用“Q：”作为前缀，每个回答用“A：”作为前缀；这部分不要 H2 和 H3
+- Use cases 每个 H3 的文案：45-60 字之间
+- FAQ 共 8 个问题，每个问题 120-200 字之间；每个问题前用“Q：”作为前缀，每个回答用“A：”作为前缀；这部分不要 H2 和 H3
 - CTA 描述性文案：20 字以内
 4. 最终按照工具页框架每个模块输出
 5. 用【】在每段开头标记，如【hero】、【benefit】等
@@ -524,7 +524,8 @@ ${outlineMarkdown}
 9. 所有三级标题统一写成 “H3：标题内容”
 10. 标题和正文换行展示，不要把标题和正文写在同一行
 11. 关于核心关键词 [${form.primaryKeyword}]，FAQ 模块之前的部分命中 10 次，FAQ 模块命中 25 次
-12. 最终输出为纯文本结构化内容，保留段落和换行，不要改回 Markdown 标题格式
+12. 最终输出为纯文本结构化内容，保留段落和换行，不要改回 Markdown 标题格式。
+13. 全文总字数在1800词之内
 
 附加上下文：
 - Hero 信息：${form.heroInfo || "无"}
