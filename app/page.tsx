@@ -851,6 +851,7 @@ function WorkflowModuleCard({
 }: WorkflowModuleCardProps) {
   const latestMarkdown = getLatestMarkdown(module.result);
   const titleMetaEnabled = canGenerateTitleMeta(module.form);
+  const [isConfirmingRemove, setIsConfirmingRemove] = useState(false);
 
   return (
     <article className="panel module-card">
@@ -867,9 +868,20 @@ function WorkflowModuleCard({
           <span className={`status-pill status-${module.phase}`}>{module.phase}</span>
           {module.folderName ? <span className="module-folder-tag">{module.folderName}</span> : null}
           {canRemove ? (
-            <button type="button" className="ghost small" onClick={() => onRemove(module.id)}>
-              删除模块
-            </button>
+            isConfirmingRemove ? (
+              <div className="remove-confirm-actions" aria-label="确认删除模块">
+                <button type="button" className="danger small" onClick={() => onRemove(module.id)}>
+                  确认删除
+                </button>
+                <button type="button" className="ghost small" onClick={() => setIsConfirmingRemove(false)}>
+                  取消
+                </button>
+              </div>
+            ) : (
+              <button type="button" className="ghost small" onClick={() => setIsConfirmingRemove(true)}>
+                删除模块
+              </button>
+            )
           ) : null}
         </div>
       </div>

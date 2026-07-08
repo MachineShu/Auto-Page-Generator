@@ -516,6 +516,22 @@ button:disabled,
   flex-shrink: 0;
 }
 
+.remove-confirm-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.danger {
+  background: var(--danger) !important;
+  color: #fffaf8 !important;
+}
+
+.danger:hover {
+  background: #8f1d14 !important;
+}
+
 .error-text {
   margin: 16px 0 0;
   color: var(--danger);
