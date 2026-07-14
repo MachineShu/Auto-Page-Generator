@@ -112,6 +112,11 @@ const CHAT_COMPLETIONS_URL = `${PROVIDER_BASE_URL}/chat/completions`;
 const MODELS_URL = `${PROVIDER_BASE_URL}/models`;
 
 const BUILTIN_MODELS = [
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+  "gpt-5.6-luna",
+  "grok-4.3",
+  "claude-sonnet-5",
   "gemini-3.5-flash",
   "gemini-3.1-pro-preview",
   "gemini-3.1-flash-lite",
@@ -125,7 +130,7 @@ const BUILTIN_MODELS = [
 
 const INITIAL_FORM: FormState = {
   apiKey: "",
-  model: "gpt-5.4-mini",
+  model: "gpt-5.6-sol",
   primaryKeyword: "",
   secondaryKeywords: "",
   lsiKeywords: "",

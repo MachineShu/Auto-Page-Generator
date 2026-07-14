@@ -18,6 +18,11 @@ type LanguageData = Record<string, LanguageKeywords>;
 
 type GenerationStatus = "idle" | "running" | "done" | "error";
 
+type ImportSummary = {
+  imported: string[];
+  skipped: string[];
+};
+
 type GenerationResult = {
   language: string;
   content: string;
@@ -68,7 +73,34 @@ const LANGUAGE_NOTES: Record<string, string> = {
   fi: "芬兰语：黏着构词，词缀繁复需留意。"
 };
 
+const LANGUAGE_ALIASES: Record<string, string[]> = {
+  es: ["西语", "西班牙语", "spanish", "espanol", "español"],
+  pt: ["葡语", "葡萄牙语", "portuguese", "portugues", "português"],
+  de: ["德语", "德文", "german", "deutsch"],
+  fr: ["法语", "法文", "french", "francais", "français"],
+  it: ["意语", "意大利语", "italian", "italiano"],
+  ru: ["俄语", "俄文", "russian", "русский"],
+  ja: ["日语", "日文", "japanese", "日本語"],
+  ko: ["韩语", "韩文", "korean", "한국어"],
+  id: ["印尼语", "印度尼西亚语", "indonesian", "bahasa indonesia"],
+  ms: ["马来语", "马来西亚语", "malay", "bahasa melayu"],
+  ar: ["阿语", "阿拉伯语", "arabic", "العربية"],
+  vi: ["越语", "越南语", "vietnamese", "tiếng việt", "tieng viet"],
+  th: ["泰语", "thai", "ไทย"],
+  pl: ["波兰语", "polish", "polski"],
+  nl: ["荷兰语", "dutch", "nederlands"],
+  no: ["挪威语", "norwegian", "norsk"],
+  sv: ["瑞典语", "swedish", "svenska"],
+  da: ["丹麦语", "danish", "dansk"],
+  fi: ["芬兰语", "finnish", "suomi"]
+};
+
 const AVAILABLE_MODELS = [
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+  "gpt-5.6-luna",
+  "grok-4.3",
+  "claude-sonnet-5",
   "gpt-5.4",
   "gpt-5.5",
   "gpt-5.4-nano",
@@ -88,16 +120,16 @@ function buildPrompt(languageData: LanguageKeywords, languageName: string, langu
 不同语种特点注意事项：
 ${languageNote}
 
-1.保持字数跟原文尽量一致，保持字数差距不超过 50-100 词。
+1.保持字数跟原文尽量一致，保持字数差距不超过 80-150 词。
 
 2.不同语种的 metadata 不一致。
 title 和 description都要命中对应的核心关键词至少 1 次，且命中1-2 个次要关键词。
 title 字数 50-55字符；description 字数 150-155 字符，命中核心关键词和1-5个次要关键词。
 
 3.SEO 关键词出现次数规则：
-每个语种的*核心关键词*要全文占比 [ 2.2% ]，最低出现 [ 35 次 ]，但是严禁超过 [ 40 ]次。你可以尽量将10多个词出现前 FAQ 前面几个部分中（比如 tilte、description 、usecase 中），将剩下的词（25-40 个词）尽可能多得塞到 FAQ 部分中。
+每个语种的*核心关键词*要全文占比 [ 2% ]，最低出现 [ 32 次 ]，但是严禁超过 [ 37 ]次。你可以尽量将10多个词出现前 FAQ 前面几个部分中（比如 tilte、description 、usecase 中），将剩下的词（25-40 个词）尽可能多得塞到 FAQ 部分中。
 hero title 、features title、benefits title、cta title 或 cta description 必须命中核心关键词各 1 次；
-次要关键词出现 [ 2-4 ] 次，LSI 关键词要出现 [ 1-3 ] 次。每个词都要出现至少一次。
+次要关键词出现 [ 5-8 ] 次，LSI 关键词要出现 [ 1-3 ] 次。每个词都要出现至少一次。
 需要将次要关键词、LSI 关键词自然融入正文中。切记不要生硬表达。
 
 4.
@@ -113,6 +145,133 @@ hero title 、features title、benefits title、cta title 或 cta description �
 
 这是被翻译的语种原文：
 ${originalText}`;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeImportText(value: string): string {
+  return value
+    .replace(/\r\n?/g, "\n")
+    .replace(/\u3000/g, " ")
+    .replace(/[；;]/g, ",")
+    .trim();
+}
+
+function createLanguageMatcher(): RegExp {
+  const aliases = Object.values(LANGUAGE_ALIASES)
+    .flat()
+    .sort((a, b) => b.length - a.length)
+    .map(escapeRegExp);
+
+  return new RegExp(
+    `(?:^|\\n)\\s*(?:\\d+\\s*[.、)）:-]?\\s*)?(${aliases.join("|")})(?=\\s|[:：]|\\n|$)`,
+    "gi"
+  );
+}
+
+function getLanguageCode(rawName: string): string | null {
+  const normalizedName = rawName.trim().toLowerCase();
+
+  for (const [code, aliases] of Object.entries(LANGUAGE_ALIASES)) {
+    if (aliases.some((alias) => alias.toLowerCase() === normalizedName)) {
+      return code;
+    }
+  }
+
+  return null;
+}
+
+function extractKeywordField(block: string, labels: string[]): string {
+  const labelPattern = labels.map(escapeRegExp).join("|");
+  const nextLabelPattern = [
+    "核心词",
+    "核心关键词",
+    "主词",
+    "主关键词",
+    "main keyword",
+    "primary keyword",
+    "次要词",
+    "次要关键词",
+    "secondary keywords",
+    "secondary keyword",
+    "lsi",
+    "lsi 关键词",
+    "lsi关键词",
+    "LSI 关键词"
+  ]
+    .map(escapeRegExp)
+    .join("|");
+
+  const match = block.match(
+    new RegExp(
+      `(?:^|\\n)\\s*(?:${labelPattern})\\s*[:：]\\s*([\\s\\S]*?)(?=\\n\\s*(?:${nextLabelPattern})\\s*[:：]|$)`,
+      "i"
+    )
+  );
+
+  return normalizeImportText(match?.[1] || "");
+}
+
+function parseSmartImport(rawText: string): {
+  data: LanguageData;
+  summary: ImportSummary;
+} {
+  const text = normalizeImportText(rawText);
+  const matcher = createLanguageMatcher();
+  const matches = Array.from(text.matchAll(matcher));
+  const data: LanguageData = {};
+  const skipped: string[] = [];
+
+  matches.forEach((match, index) => {
+    const languageName = match[1];
+    const languageCode = getLanguageCode(languageName);
+    if (!languageCode) return;
+
+    const start = match.index || 0;
+    const nextStart = matches[index + 1]?.index ?? text.length;
+    const block = text.slice(start, nextStart);
+    const keywords = {
+      mainKeyword: extractKeywordField(block, [
+        "核心词",
+        "核心关键词",
+        "主词",
+        "主关键词",
+        "main keyword",
+        "primary keyword"
+      ]),
+      secondaryKeywords: extractKeywordField(block, [
+        "次要词",
+        "次要关键词",
+        "secondary keyword",
+        "secondary keywords"
+      ]),
+      lsiKeywords: extractKeywordField(block, [
+        "LSI 关键词",
+        "LSI关键词",
+        "lsi keywords",
+        "lsi keyword",
+        "lsi"
+      ])
+    };
+
+    if (
+      keywords.mainKeyword &&
+      keywords.secondaryKeywords &&
+      keywords.lsiKeywords
+    ) {
+      data[languageCode] = keywords;
+    } else {
+      skipped.push(languageName);
+    }
+  });
+
+  const imported = Object.keys(data)
+    .map((code) => LANGUAGES.find((language) => language.code === code)?.name)
+    .filter((name): name is string => Boolean(name));
+
+  return { data, summary: { imported, skipped } };
 }
 
 async function generateContent(
@@ -163,6 +322,10 @@ export default function AutoLanguagePage() {
   const [languageData, setLanguageData] = useState<LanguageData>({});
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [smartImportOpen, setSmartImportOpen] = useState(false);
+  const [smartImportText, setSmartImportText] = useState("");
+  const [smartImportSummary, setSmartImportSummary] =
+    useState<ImportSummary | null>(null);
   const [tempKeywords, setTempKeywords] = useState<LanguageKeywords>({
     mainKeyword: "",
     secondaryKeywords: "",
@@ -170,7 +333,7 @@ export default function AutoLanguagePage() {
   });
 
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState("gpt-5.4");
+  const [model, setModel] = useState("gpt-5.6-sol");
   const [originalText, setOriginalText] = useState("");
   const [status, setStatus] = useState<GenerationStatus>("idle");
   const [results, setResults] = useState<GenerationResult[]>([]);
@@ -193,6 +356,11 @@ export default function AutoLanguagePage() {
     setSelectedLanguage(null);
   }
 
+  function closeSmartImportDialog() {
+    setSmartImportOpen(false);
+    setSmartImportSummary(null);
+  }
+
   function saveKeywords() {
     if (selectedLanguage) {
       setLanguageData((prev) => ({
@@ -201,6 +369,28 @@ export default function AutoLanguagePage() {
       }));
     }
     closeDialog();
+  }
+
+  function confirmSmartImport() {
+    if (!smartImportText.trim()) {
+      alert("请先粘贴多语言关键词内容");
+      return;
+    }
+
+    const { data, summary } = parseSmartImport(smartImportText);
+
+    if (summary.imported.length === 0) {
+      setSmartImportSummary(summary);
+      alert("没有识别到可导入的完整语种，请检查语言名称和三类关键词字段。");
+      return;
+    }
+
+    setLanguageData((prev) => ({
+      ...prev,
+      ...data
+    }));
+    setSmartImportSummary(summary);
+    setSmartImportText("");
   }
 
   function hasKeywords(languageCode: string): boolean {
@@ -342,6 +532,13 @@ export default function AutoLanguagePage() {
             <h2>语言配置区</h2>
             <p>点击语言按钮配置该语言的关键词。已配置的语言会高亮显示。</p>
           </div>
+          <button
+            type="button"
+            className="smart-import-button"
+            onClick={() => setSmartImportOpen(true)}
+          >
+            智能导入
+          </button>
         </div>
 
         <div className="language-grid">
@@ -505,6 +702,79 @@ export default function AutoLanguagePage() {
             ))}
           </div>
         </section>
+      )}
+
+      {smartImportOpen && (
+        <div className="dialog-overlay" onClick={closeSmartImportDialog}>
+          <div
+            className="dialog-content smart-import-dialog"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="dialog-header">
+              <h2>智能导入</h2>
+              <button
+                type="button"
+                className="dialog-close"
+                onClick={closeSmartImportDialog}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="dialog-body">
+              <label className="field">
+                <span>粘贴多语言关键词</span>
+                <textarea
+                  value={smartImportText}
+                  onChange={(e) => {
+                    setSmartImportText(e.target.value);
+                    setSmartImportSummary(null);
+                  }}
+                  placeholder={`例如：
+1.西班牙语
+核心词：...
+次要词：...
+LSI 关键词：...
+
+4.俄语
+核心词：...
+次要词：...
+LSI 关键词：...`}
+                  rows={14}
+                />
+              </label>
+
+              {smartImportSummary && (
+                <div className="smart-import-summary">
+                  <p>
+                    已导入：{" "}
+                    {smartImportSummary.imported.length > 0
+                      ? smartImportSummary.imported.join("、")
+                      : "无"}
+                  </p>
+                  {smartImportSummary.skipped.length > 0 && (
+                    <p>
+                      未导入：{smartImportSummary.skipped.join("、")}，请检查是否缺少核心词、次要词或 LSI 关键词。
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="dialog-footer">
+              <button
+                type="button"
+                className="ghost"
+                onClick={closeSmartImportDialog}
+              >
+                取消
+              </button>
+              <button type="button" onClick={confirmSmartImport}>
+                确认
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {dialogOpen && selectedLanguage && (

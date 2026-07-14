@@ -1,0 +1,11 @@
+
+> auto-page-generator@0.1.0 dev
+> next dev -p 3001
+
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+   ▲ Next.js 16.0.7 (Turbopack)
+   - Local:         http://localhost:3001
+   - Network:       http://192.168.71.119:3001
+
+ ✓ Starting...
+ ✓ Ready in 5.4s
