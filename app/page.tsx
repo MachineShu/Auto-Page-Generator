@@ -118,7 +118,6 @@ const BUILTIN_MODELS = [
   "grok-4.3",
   "claude-sonnet-5",
   "gemini-3.5-flash",
-  "gemini-3.1-pro-preview",
   "gemini-3.1-flash-lite",
   "gpt-5.4-mini",
   "gpt-5.4",
@@ -530,7 +529,9 @@ ${outlineMarkdown}
 10. 标题和正文换行展示，不要把标题和正文写在同一行
 11. 关于核心关键词 [${form.primaryKeyword}]，FAQ 模块之前的部分命中 10 次，FAQ 模块命中 25 次
 12. 最终输出为纯文本结构化内容，保留段落和换行，不要改回 Markdown 标题格式。
-13. 全文总字数在1800词之内
+13. 全文总字数在1800词之内。
+14.【最重要】
+严禁生成中文；每个模块只放一个对应的标签 【xxx】，标签不要放到描述开头，而是放到 H1 或 H2 前（且单独作为一行）；严格控制核心关键词密度，核心关键词数量最多不超过38个。
 
 附加上下文：
 - Hero 信息：${form.heroInfo || "无"}
