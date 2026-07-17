@@ -115,21 +115,18 @@ const BUILTIN_MODELS = [
   "gpt-5.6-sol",
   "gpt-5.6-terra",
   "gpt-5.6-luna",
-  "grok-4.3",
-  "claude-sonnet-5",
   "gemini-3.5-flash",
   "gemini-3.1-flash-lite",
-  "gpt-5.4-mini",
-  "gpt-5.4",
-  "claude-sonnet-4-6",
   "claude-opus-4-6",
   "deepseek-v4-flash",
   "deepseek-v4-pro"
 ] as const;
 
+const RECOMMENDED_MODEL = "gemini-3.5-flash";
+
 const INITIAL_FORM: FormState = {
   apiKey: "",
-  model: "gpt-5.6-sol",
+  model: RECOMMENDED_MODEL,
   primaryKeyword: "",
   secondaryKeywords: "",
   lsiKeywords: "",
@@ -970,7 +967,7 @@ function WorkflowModuleCard({
                   >
                     {module.availableModels.map((model) => (
                       <option key={model} value={model}>
-                        {model}
+                        {model === RECOMMENDED_MODEL ? `${model}（首推）` : model}
                       </option>
                     ))}
                   </select>
