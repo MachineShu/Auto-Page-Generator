@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import JSZip from "jszip";
 
 type Language = {
   code: string;
@@ -24,9 +25,15 @@ type ImportSummary = {
 };
 
 type GenerationResult = {
+  languageCode: string;
   language: string;
   content: string;
   error?: string;
+};
+
+type KeywordCount = {
+  keyword: string;
+  count: number;
 };
 
 const LANGUAGES: Language[] = [
@@ -135,6 +142,7 @@ hero title 、features title、benefits title、cta title 或 cta description �
 4.
 严禁：语法错误、句式断裂残缺、同质化重复表达。严禁跟英文混杂，要符合地道的当地语种的表达。
 不要省略文案，特别是 faq 的大段文本不要随意省略。
+不要输出 <h1> <h2> <h3> 等标题标签。
 
 这是词群：
 - 核心关键词：${languageData.mainKeyword}
@@ -149,6 +157,22 @@ ${originalText}`;
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function splitKeywords(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/[,，;；、\n]+/)
+        .map((keyword) => keyword.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function countKeywordOccurrences(content: string, keyword: string): number {
+  if (!keyword) return 0;
+  return content.match(new RegExp(escapeRegExp(keyword), "giu"))?.length ?? 0;
 }
 
 function normalizeImportText(value: string): string {
@@ -333,11 +357,12 @@ export default function AutoLanguagePage() {
   });
 
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState("gpt-5.6-sol");
+  const [model, setModel] = useState("gemini-3.5-flash");
   const [originalText, setOriginalText] = useState("");
   const [status, setStatus] = useState<GenerationStatus>("idle");
   const [results, setResults] = useState<GenerationResult[]>([]);
   const [currentLanguage, setCurrentLanguage] = useState<string>("");
+  const [keywordDensityOpen, setKeywordDensityOpen] = useState(false);
 
   function openDialog(languageCode: string) {
     setSelectedLanguage(languageCode);
@@ -447,6 +472,7 @@ export default function AutoLanguagePage() {
         const content = await generateContent(apiKey, model, prompt);
 
         return {
+          languageCode,
           language: language.name,
           content
         };
@@ -454,6 +480,7 @@ export default function AutoLanguagePage() {
         const errorMessage =
           error instanceof Error ? error.message : "生成失败";
         return {
+          languageCode,
           language: language.name,
           content: "",
           error: errorMessage
@@ -489,6 +516,43 @@ export default function AutoLanguagePage() {
     anchor.download = `${language}_optimized.txt`;
     anchor.click();
     window.URL.revokeObjectURL(url);
+  }
+
+  async function downloadAllResults() {
+    const successfulResults = results.filter((result) => !result.error);
+    if (successfulResults.length === 0) return;
+
+    const zip = new JSZip();
+    successfulResults.forEach((result) => {
+      zip.file(`${result.language}_optimized.txt`, result.content);
+    });
+
+    const blob = await zip.generateAsync({ type: "blob" });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "all_optimized_languages.zip";
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  function getKeywordCounts(result: GenerationResult): {
+    main: KeywordCount[];
+    secondary: KeywordCount[];
+  } {
+    const keywords = languageData[result.languageCode];
+    if (!keywords) return { main: [], secondary: [] };
+
+    const toCounts = (values: string[]) =>
+      values.map((keyword) => ({
+        keyword,
+        count: countKeywordOccurrences(result.content, keyword)
+      }));
+
+    return {
+      main: toCounts(splitKeywords(keywords.mainKeyword)),
+      secondary: toCounts(splitKeywords(keywords.secondaryKeywords))
+    };
   }
 
   function clearAll() {
@@ -606,7 +670,7 @@ export default function AutoLanguagePage() {
             <select value={model} onChange={(e) => setModel(e.target.value)}>
               {AVAILABLE_MODELS.map((m) => (
                 <option key={m} value={m}>
-                  {m}
+                  {m === "gemini-3.5-flash" ? `${m}（推荐）` : m}
                 </option>
               ))}
             </select>
@@ -661,6 +725,18 @@ export default function AutoLanguagePage() {
               <h2>生成结果</h2>
               <p>已完成 {results.length} 个语言的内容优化。</p>
             </div>
+            <div className="inline-actions result-summary-actions">
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => setKeywordDensityOpen(true)}
+              >
+                关键词密度
+              </button>
+              <button type="button" onClick={downloadAllResults}>
+                下载全部 ZIP
+              </button>
+            </div>
           </div>
 
           <div className="results-list">
@@ -702,6 +778,58 @@ export default function AutoLanguagePage() {
             ))}
           </div>
         </section>
+      )}
+
+      {keywordDensityOpen && (
+        <div
+          className="dialog-overlay"
+          onClick={() => setKeywordDensityOpen(false)}
+        >
+          <div
+            className="dialog-content keyword-density-dialog"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="dialog-header">
+              <h2>关键词次数</h2>
+              <button
+                type="button"
+                className="dialog-close"
+                onClick={() => setKeywordDensityOpen(false)}
+                aria-label="关闭"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="dialog-body keyword-density-body">
+              {results.filter((result) => !result.error).map((result) => {
+                const counts = getKeywordCounts(result);
+                return (
+                  <section key={result.languageCode} className="keyword-language-group">
+                    <h3>{result.language}</h3>
+                    <div className="keyword-count-section">
+                      <h4>主词</h4>
+                      {counts.main.map((item) => (
+                        <div key={item.keyword} className="keyword-count-row">
+                          <span>{item.keyword}</span>
+                          <strong>{item.count} 次</strong>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="keyword-count-section">
+                      <h4>次要词</h4>
+                      {counts.secondary.map((item) => (
+                        <div key={item.keyword} className="keyword-count-row">
+                          <span>{item.keyword}</span>
+                          <strong>{item.count} 次</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       )}
 
       {smartImportOpen && (
